@@ -1,0 +1,124 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Strobos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#171614;--s1:#201f1c;--s2:#2a2824;--fg:#f3ead8;--mut:#9a917f;--acc:#ff6a1f;--line:rgba(243,234,216,.08);color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 'DM Sans',system-ui,sans-serif}
+main{max-width:600px;margin:0 auto;padding:16px 16px 44px;display:grid;gap:16px}
+header{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px}.brand svg{width:34px}.brand b{font:italic 400 30px/1 'Instrument Serif',Georgia,serif}
+#stage{display:grid;place-items:center;background:#0e0d0c;border-radius:24px;overflow:hidden}
+#view{display:none;max-width:100%;max-height:58vh;width:auto;height:auto}
+#empty{color:var(--mut);padding:64px 28px;text-align:center;max-width:300px}
+.ready #view{display:block}.ready #empty{display:none}
+.bar,.exp{display:none;align-items:center;gap:12px}.ready .bar,.ready .exp{display:flex}
+#play{flex:none;width:46px;height:46px;border-radius:50%;background:var(--fg);color:var(--bg);border:0;padding:0;display:grid;place-items:center}
+#play svg{width:18px;height:18px;fill:currentColor}
+#time{font-variant-numeric:tabular-nums;color:var(--mut);font-size:13px;min-width:86px;text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:28px;flex:1;min-width:0;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:2px;background:rgba(243,234,216,.16)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--fg);margin-top:-6.5px;border:0}
+input[type=range]::-moz-range-track{height:3px;background:rgba(243,234,216,.16);border-radius:2px}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--fg);border:0}
+button,.btn{font:inherit;font-size:14px;font-weight:500;color:var(--fg);background:var(--s2);border:0;border-radius:999px;padding:0 18px;min-height:42px;cursor:pointer;display:inline-flex;align-items:center;transition:opacity .2s,transform .1s}
+button:active,.btn:active{transform:scale(.98)}button:disabled{opacity:.4}
+button.p{background:var(--fg);color:var(--bg);font-weight:600}#mp4{background:var(--acc);color:var(--bg);font-weight:600}
+.ghost{background:transparent;color:var(--mut);padding:0 12px}
+textarea{width:100%;box-sizing:border-box;font:13px/1.55 ui-monospace,Menlo,monospace;color:var(--fg);background:var(--s1);caret-color:var(--fg);border:1px solid var(--line);border-radius:18px;padding:14px;white-space:pre;resize:vertical}
+#code{height:260px}textarea:focus,button:focus-visible{outline:2px solid rgba(243,234,216,.4);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row .sp{flex:1}
+#msg{color:var(--mut);font-size:13px;min-height:1.3em}#msg.e{color:#ff8a5c}
+progress{width:100%;height:4px;accent-color:var(--acc)}
+details summary{cursor:pointer;color:var(--mut);padding:2px 0;font-size:14px}details textarea{height:210px;margin:10px 0;white-space:pre-wrap}
+</style></head><body><main id="app">
+<header><div class="brand"><svg viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"><defs><linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse"><stop stop-color="#ff6a1f"/><stop offset="1" stop-color="#f3ead8"/></linearGradient></defs><path d="M26 14 10 32l16 18" stroke="url(#g)" opacity=".35"/><path d="M36 14 20 32l16 18" stroke="url(#g)" opacity=".65"/><path d="M46 14 30 32l16 18" stroke="url(#g)"/><circle cx="54" cy="32" r="3.5" fill="#f3ead8" stroke="none"/></svg><b>Strobos</b></div></header>
+<div id="stage"><p id="empty">Paste HTML below and run it. Your video appears here.</p><canvas id="view"></canvas></div>
+<div class="bar"><button id="play" aria-label="Play"></button><input id="scrub" type="range" min="0" value="0"><span id="time"></span></div>
+<div class="exp"><button id="mp4">Export MP4</button><button id="mp3">Audio MP3</button></div>
+<progress id="pg" value="0" max="1" hidden></progress><div id="msg"></div>
+<textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste HTML from Claude, Codex or any model."></textarea>
+<div class="row"><button id="run" class="p">Run</button><label class="btn">Open .html<input id="file" type="file" accept=".html,text/html" hidden></label><span class="sp"></span></div>
+<details><summary>Brief for AI</summary><textarea id="brief" readonly></textarea><button id="copy">Copy brief</button></details>
+</main>
+<script>
+const BRIEF=`Make one self-contained HTML file for Strobos, a code-to-video player.
+
+- Use one <canvas> and draw only on it. DOM overlays are not captured. Scripts may load only from cdnjs.cloudflare.com or cdn.jsdelivr.net, pinned to exact versions (three.js, GSAP, p5 and similar are fine). No other network.
+- Call strobos.config({width, height, fps, duration}). Sizes must be even, duration is in seconds, e.g. {width:1080, height:1920, fps:30, duration:8}. Set the canvas to the same width and height.
+- Set strobos.render = (frame, t) => { ... }. It is called once per frame and may be called in any order. Everything on screen must be a pure function of frame or t (seconds). No Date.now, performance.now, requestAnimationFrame, timers or state that accumulates.
+- Optional sound: strobos.audio = async (ctx, duration) => { ... }. ctx is an OfflineAudioContext. Build music and sound effects with oscillators, noise buffers, gains and filters scheduled at absolute times in seconds, all connected to ctx.destination.
+- Helpers: strobos.interpolate(v, [in...], [out...], {easing, clamp}), strobos.spring(frame, {damping, stiffness, mass}), strobos.ease.linear/in/out/inOut, strobos.random(seed).
+- Optional: strobos.ready = a Promise for async setup; strobos.canvas = the canvas element if the page has more than one.
+- With three.js, create the WebGLRenderer on the canvas, call renderer.setSize(width, height, false), and call renderer.render inside strobos.render.`;
+function RT(){const E={linear:t=>t,in:t=>t*t*t,out:t=>1-(1-t)**3,inOut:t=>t<.5?4*t**3:1-(-2*t+2)**3/2};
+const st=window.strobos={cfg:{width:1080,height:1920,fps:30,duration:5},config(o){Object.assign(st.cfg,o)},render:null,audio:null,canvas:null,ready:null,ease:E,
+interpolate(v,i,o,op={}){const e=op.easing||E.linear,cl=op.clamp!==false;let k=Math.max(0,i.findIndex((x,j)=>v<=i[j+1]||j===i.length-2));let t=(v-i[k])/(i[k+1]-i[k]);if(cl)t=Math.min(1,Math.max(0,t));return o[k]+(o[k+1]-o[k])*e(t)},
+spring(f,o={}){if(typeof f==='object'){o=f.config||{};f=f.frame}if(f<=0)return 0;const{damping:d=12,stiffness:k=120,mass:m=1}=o,n=8,dt=1/st.cfg.fps/n;let x=0,v=0;for(let i=0;i<f*n;i++){v+=((-k*(x-1)-d*v)/m)*dt;x+=v*dt}return x},
+random(seed){let t=((typeof seed==='string'?[...seed].reduce((a,c)=>(a*31+c.charCodeAt(0))|0,7):Math.floor(seed*1e4))+0x6D2B79F5)>>>0;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}};
+const rep=m=>parent.postMessage({strobosError:String(m)},'*');addEventListener('error',e=>rep(e.message));addEventListener('unhandledrejection',e=>rep(e.reason&&e.reason.message||e.reason))}
+const $=id=>document.getElementById(id),app=$('app'),view=$('view'),vx=view.getContext('2d'),msg=$('msg');
+const say=(t,e)=>{msg.textContent=t;msg.className=e?'e':''};
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',PAUSE='<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+let fr=null,sc=null,W,H,FPS,DUR,frame=0,playing=false,t0=0,buf=null,src=null,ac=null,busy=false;
+$('brief').value=BRIEF;
+addEventListener('message',e=>{if(e.data&&e.data.strobosError)say('Scene error: '+e.data.strobosError,1)});
+const ui=()=>{$('play').innerHTML=playing?PAUSE:PLAY;$('play').setAttribute('aria-label',playing?'Pause':'Play')};
+function stopAudio(){try{src&&src.stop()}catch(e){}src=null}
+function startAudio(o){stopAudio();if(!buf)return;src=ac.createBufferSource();src.buffer=buf;src.connect(ac.destination);src.start(0,o)}
+function stop(){playing=false;stopAudio();ui()}
+function play(){if(!sc)return;ac=ac||new AudioContext();ac.resume();if(frame>=DUR-1)frame=0;playing=true;t0=performance.now()-frame/FPS*1000;startAudio(frame/FPS);ui()}
+function draw(f){try{sc.s.render(f,f/FPS);vx.drawImage(sc.c,0,0)}catch(e){say('Scene error: '+e.message,1);stop()}$('scrub').value=f;$('time').textContent=fmt(f/FPS)+' / '+fmt(DUR/FPS)}
+async function load(){stop();sc=null;buf=null;app.classList.remove('ready');say('Loading…');$('run').disabled=true;
+try{if(fr)fr.remove();fr=document.createElement('iframe');fr.setAttribute('sandbox','allow-scripts allow-same-origin');fr.style.cssText='position:fixed;left:-9999px;top:0;width:1280px;height:720px;border:0;visibility:hidden';
+let code=$('code').value;if(!code.trim())throw new Error('Paste some HTML first.');code=code.replace(/<script\b(?![^>]*\bcrossorigin)(?=[^>]*\bsrc=)/gi,'<script crossorigin="anonymous"');const inj='<script>('+RT.toString()+')()<'+'/script>';
+code=/<head[^>]*>/i.test(code)?code.replace(/<head[^>]*>/i,m=>m+inj):inj+code;fr.srcdoc=code;
+const done=new Promise((res,rej)=>{fr.onload=res;setTimeout(()=>rej(new Error('The page took too long to load.')),20000)});document.body.append(fr);await done;
+const s=fr.contentWindow.strobos;if(s.ready)await s.ready;
+if(typeof s.render!=='function')throw new Error('Missing strobos.render = (frame, t) => { … }');
+const c=s.canvas||fr.contentDocument.querySelector('canvas');if(!c)throw new Error('Add a <canvas> to draw on.');
+({width:W,height:H,fps:FPS}=s.cfg);DUR=Math.max(1,Math.round(s.cfg.duration*FPS));
+if(W%2||H%2)throw new Error('Width and height must be even numbers.');
+if(c.width!==W||c.height!==H)throw new Error('Canvas must be '+W+'×'+H+'. Set canvas.width and canvas.height.');
+if(typeof s.audio==='function'){const sr=44100,o=new OfflineAudioContext(2,Math.ceil(s.cfg.duration*sr),sr);await s.audio(o,s.cfg.duration);buf=await o.startRendering()}
+sc={s,c};view.width=W;view.height=H;$('scrub').max=DUR-1;$('mp3').style.display=buf?'':'none';frame=0;app.classList.add('ready');draw(0);ui();say(buf?'Ready, with audio.':'Ready, no audio.')}
+catch(e){say(e.message||String(e),1)}$('run').disabled=false}
+function loop(){if(playing&&!busy){const f=Math.floor((performance.now()-t0)/1000*FPS);if(f>=DUR){frame=DUR-1;draw(frame);stop()}else{frame=f;draw(f)}}requestAnimationFrame(loop)}
+$('run').onclick=load;$('play').onclick=()=>playing?stop():play();
+$('scrub').oninput=e=>{stop();frame=+e.target.value;draw(frame)};
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('code').value=r.result;load()};r.readAsText(f)};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(BRIEF);say('Brief copied.')}catch(e){$('brief').select();say('Select the text and copy it.')}};
+async function save(name,data){let dl=null;try{dl=await claude.use('downloads')}catch(e){}
+if(dl){try{await dl.save({filename:name,data});say('Saved '+name)}catch(e){say(e.code==='declined'?'Save cancelled.':'Save failed: '+(e.message||e.code),e.code!=='declined')}}
+else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click();say('Download started.')}}
+const tick=()=>new Promise(r=>setTimeout(r,0));
+$('mp4').onclick=async()=>{if(busy||!sc)return;if(!window.VideoEncoder||!window.Mp4Muxer){say('This browser lacks WebCodecs. Try Chrome, Edge or Safari 16.4+.',1);return}
+busy=true;stop();$('mp4').disabled=true;const pg=$('pg');pg.hidden=false;
+try{let cod=null;const br=Math.round(W*H*FPS*.08);for(const c of['avc1.64002A','avc1.4D0028','avc1.42E01F']){if((await VideoEncoder.isConfigSupported({codec:c,width:W,height:H,bitrate:br,framerate:FPS})).supported){cod=c;break}}
+if(!cod)throw new Error('No H.264 encoder at this size.');
+let ach=0,sr=0,useA=false;if(buf&&window.AudioEncoder){ach=Math.min(2,buf.numberOfChannels);sr=buf.sampleRate;useA=(await AudioEncoder.isConfigSupported({codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ach,bitrate:128000})).supported;if(!useA)say('Audio encoding is unsupported here; exporting video only.')}
+const tg=new Mp4Muxer.ArrayBufferTarget(),mx=new Mp4Muxer.Muxer({target:tg,fastStart:'in-memory',video:{codec:'avc',width:W,height:H},...(useA?{audio:{codec:'aac',numberOfChannels:ach,sampleRate:sr}}:{})});
+let err=null;const ve=new VideoEncoder({output:(c,m)=>mx.addVideoChunk(c,m),error:e=>err=e});ve.configure({codec:cod,width:W,height:H,bitrate:br,framerate:FPS});
+for(let i=0;i<DUR;i++){if(err)throw err;sc.s.render(i,i/FPS);const vf=new VideoFrame(sc.c,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});ve.encode(vf,{keyFrame:i%FPS===0});vf.close();
+while(ve.encodeQueueSize>6)await tick();if(i%4===0){pg.value=i/DUR*.9;say('Rendering frame '+i+' of '+DUR);await tick()}}
+await ve.flush();
+if(useA){const ae=new AudioEncoder({output:(c,m)=>mx.addAudioChunk(c,m),error:e=>err=e});ae.configure({codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ach,bitrate:128000});const n=buf.length;
+for(let o=0;o<n;o+=4800){const len=Math.min(4800,n-o),d=new Float32Array(len*ach);for(let k=0;k<ach;k++)d.set(buf.getChannelData(k).subarray(o,o+len),k*len);ae.encode(new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:len,numberOfChannels:ach,timestamp:Math.round(o/sr*1e6),data:d}))}
+await ae.flush()}
+mx.finalize();pg.value=1;await save('strobos-'+W+'x'+H+'.mp4',new Blob([tg.buffer]))}
+catch(e){say('Export failed: '+(e.message||e),1)}
+busy=false;$('mp4').disabled=false;pg.hidden=true;draw(frame)};
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=b=>{let c=-1;for(let i=0;i<b.length;i++)c=crcT[(c^b[i])&255]^(c>>>8);return(c^-1)>>>0};
+function zip(name,d){const nm=new TextEncoder().encode(name),cr=crc(d),L=30+nm.length,z=d.length;const a=new DataView(new ArrayBuffer(L));a.setUint32(0,0x04034b50,1);a.setUint16(4,20,1);a.setUint32(14,cr,1);a.setUint32(18,z,1);a.setUint32(22,z,1);a.setUint16(26,nm.length,1);new Uint8Array(a.buffer).set(nm,30);
+const c=new DataView(new ArrayBuffer(46+nm.length));c.setUint32(0,0x02014b50,1);c.setUint16(4,20,1);c.setUint16(6,20,1);c.setUint32(16,cr,1);c.setUint32(20,z,1);c.setUint32(24,z,1);c.setUint16(28,nm.length,1);new Uint8Array(c.buffer).set(nm,46);
+const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,1);e.setUint16(8,1,1);e.setUint16(10,1,1);e.setUint32(12,c.byteLength,1);e.setUint32(16,L+z,1);return new Blob([a,d,c,e])}
+$('mp3').onclick=async()=>{if(!buf)return;if(!window.lamejs){say('MP3 encoder failed to load.',1);return}
+try{say('Encoding MP3…');await tick();const ch=Math.min(2,buf.numberOfChannels),sr=buf.sampleRate,n=buf.length,en=new lamejs.Mp3Encoder(ch,sr,128),P=[];
+const I=a=>{const o=new Int16Array(n);for(let i=0;i<n;i++)o[i]=Math.max(-1,Math.min(1,a[i]))*32767;return o},L=I(buf.getChannelData(0)),R=ch>1?I(buf.getChannelData(1)):null;
+for(let o=0;o<n;o+=1152){const b=R?en.encodeBuffer(L.subarray(o,o+1152),R.subarray(o,o+1152)):en.encodeBuffer(L.subarray(o,o+1152));if(b.length)P.push(b)}P.push(en.flush());
+await save('strobos-audio.zip',zip('strobos-audio.mp3',new Uint8Array(await new Blob(P).arrayBuffer())))}catch(e){say('MP3 failed: '+(e.message||e),1)}};
+ui();loop();
+</script></body></html>
